@@ -74,6 +74,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="quartoend_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="quartoend_files/libs/bootstrap/bootstrap-efbb37e9afcc02144ebbc7afd12a776f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -121,7 +150,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The analysis asks whether sleep duration is associated with obesity among U.S. adults. The current wording says adjustment for demographic factors, but the full model also includes socioeconomic variables (education, income, and marital status) and behavioral/mental-health variables (alcohol use, smoking, and feeling depressed). Consider revising the question so it matches the full model: “Among U.S. adults, is sleep duration associated with obesity after adjusting for demographic, socioeconomic, and selected behavioral factors?”</p>
+<p>The analysis asks whether sleep duration is associated with obesity among U.S. adults. The current wording says adjustment for demographic factors, but the full model also includes socioeconomic variables (education, income, and marital status) and behavioral/mental-health variables (alcohol use, smoking, and feeling depressed).</p>
 </div>
 </div>
 </section>
@@ -333,19 +362,6 @@ $ INDFMPIR &lt;dbl&gt; 5.00, 5.00, 1.41, 1.53, 3.60, NA, 0.63, 5.00, 1.33, 1.32,
 </section>
 <section id="variable-rename" class="level2">
 <h2 class="anchored" data-anchor-id="variable-rename">Variable Rename</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>Analysis note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Renaming the original NHANES variables makes the later code easier to read. Keep the original NHANES variable names documented somewhere in the project so the derived variables can be traced back to their source.</p>
-</div>
-</div>
 <p>###sleep variables</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>sleep1 <span class="ot">&lt;-</span>  sleep <span class="sc">|&gt;</span> </span>
@@ -7207,200 +7223,66 @@ F =  2.437031  on  2  and  15  df: p= 0.12121 </code></pre>
 </section>
 <section id="save-results-for-the-dashboard" class="level2">
 <h2 class="anchored" data-anchor-id="save-results-for-the-dashboard">Save results for the dashboard</h2>
-<pre class="{#| echo: true}"><code>dir.create("dashboard", showWarnings = FALSE)
-
-w_all &lt;- df1_w$WTMEC2YR
-
-# Readable labels for numeric codes.
-# CHECK these against the NHANES codebook pages before publishing.
-value_labels &lt;- list(
-  obese = c("0" = "Not obese (BMI &lt;30)", "1" = "Obese (BMI 30+)"),
-  gender = c("1" = "Male", "2" = "Female"),
-  race = c("1" = "Mexican American", "2" = "Other Hispanic",
-           "3" = "Non-Hispanic White", "4" = "Non-Hispanic Black",
-           "5" = "Other race, including multiracial"),
-  education = c("1" = "Less than 9th grade", "2" = "9th-11th grade",
-                "3" = "High school graduate or GED",
-                "4" = "Some college or associate degree",
-                "5" = "College graduate or above"),
-  marital_stat = c("1" = "Married or living with partner",
-                   "2" = "Widowed, divorced, or separated",
-                   "3" = "Never married"),
-  diabetes = c("1" = "Yes", "2" = "No", "3" = "Borderline"),
-  prediabetes = c("1" = "Yes", "2" = "No"),
-  feeling_depressed = c("0" = "Not at all", "1" = "Several days",
-                        "2" = "More than half the days",
-                        "3" = "Nearly every day"),
-  usually_works_35plus_hours = c("1" = "Yes", "2" = "No")
-)
-
-# Display order for text variables that would otherwise sort alphabetically
-level_order &lt;- list(
-  bmi_group    = c("Underweight", "Normal weight", "Overweight", "Obesity"),
-  height_group = c("Below average", "Average", "Above average")
-)
-
-var_labels &lt;- c(
-  obese = "Obesity (BMI 30+)", sleep_group = "Sleep duration",
-  age_group = "Age group", income_group = "Income group",
-  alcohol_group = "Alcohol use (frequency)", height_group = "Height group",
-  diabetes = "Diabetes", prediabetes = "Prediabetes",
-  race = "Race/ethnicity", education = "Education",
-  marital_stat = "Marital status", gender = "Gender",
-  usually_works_35plus_hours = "Usually works 35+ hours/week",
-  feeling_depressed = "Feeling down or depressed",
-  smoking_status = "Smoking status", bmi_group = "BMI category",
-  age = "Age (years)", height = "Height (cm)", bmi = "BMI (kg/m2)"
-)
-
-get_levels &lt;- function(v) {
-  x &lt;- df1_w[[v]]
-  if (!is.null(level_order[[v]])) {
-    as.character(level_order[[v]])
-  } else if (is.factor(x)) {
-    levels(x)
-  } else {
-    as.character(sort(unique(x[!is.na(x)])))
-  }
-}
-
-label_levels &lt;- function(v, lev) {
-  lab &lt;- value_labels[[v]]
-  out &lt;- if (is.null(lab)) lev else unname(lab[lev])
-  ifelse(is.na(out), lev, out)
-}
-
-# 1. Sample flow
-sample_flow &lt;- tibble(
-  step = c("Adults 20+ in merged file",
-           "With a positive exam weight",
-           "Complete data on all model variables"),
-  n = c(nrow(df1), nrow(df1_w), sum(df_full$cc))
-)
-
-# 2. Overall obesity prevalence (weighted)
-prev_all   &lt;- svymean(~obese, des_all, na.rm = TRUE)
-prev_model &lt;- svymean(~obese, des, na.rm = TRUE)
-prev_overall &lt;- tibble(
-  sample = c("Adults with exam weight", "Model sample (complete cases)"),
-  prevalence_pct = round(100 * c(coef(prev_all), coef(prev_model)), 1),
-  se_pct = round(100 * c(SE(prev_all), SE(prev_model)), 2)
-)
-
-# 3. Categorical variable summaries: weighted % and unweighted n, missing as its own row
-cat_vars &lt;- c("obese", chi_vars, "bmi_group")
-
-cat_summary &lt;- bind_rows(lapply(cat_vars, function(v) {
-  lev &lt;- get_levels(v)
-  f   &lt;- factor(as.character(df1_w[[v]]), levels = lev)
-  ok  &lt;- !is.na(f)
-  wsum &lt;- vapply(seq_along(lev), function(k) sum(w_all[which(f == lev[k])]),
-                 numeric(1))
-  tibble(
-    variable = v,
-    level = c(label_levels(v, lev), "Missing"),
-    n = c(as.vector(table(f)), sum(!ok)),
-    pct_weighted = c(round(100 * wsum / sum(w_all[ok]), 1), NA_real_)
-  )
-}))
-
-# 4. Numeric variable summaries
-num_vars &lt;- c("age", "height", "bmi")
-
-num_summary &lt;- bind_rows(lapply(num_vars, function(v) {
-  m &lt;- svymean(as.formula(paste0("~", v)), des_all, na.rm = TRUE)
-  x &lt;- df1_w[[v]]
-  tibble(
-    variable = v,
-    n = sum(!is.na(x)),
-    n_missing = sum(is.na(x)),
-    mean_weighted = round(as.numeric(coef(m)), 1),
-    se = round(as.numeric(SE(m)), 2),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE)
-  )
-}))
-
-# 5. Missingness among adults with an exam weight
-id_cols   &lt;- c("SEQN", "WTMEC2YR", "SDMVPSU", "SDMVSTRA")
-vars_miss &lt;- setdiff(names(df1_w), id_cols)
-
-missingness &lt;- tibble(
-  variable = vars_miss,
-  n_missing = unname(vapply(vars_miss, function(v) sum(is.na(df1_w[[v]])),
-                            numeric(1)))
-) |&gt;
-  mutate(pct_missing = round(100 * n_missing / nrow(df1_w), 1)) |&gt;
-  arrange(desc(pct_missing))
-
-# 6. Bivariate: weighted % obese in each category
-obese_vec &lt;- df1_w$obese
-
-bivariate_prev &lt;- bind_rows(lapply(chi_vars, function(v) {
-  lev &lt;- get_levels(v)
-  f   &lt;- factor(as.character(df1_w[[v]]), levels = lev)
-  ok  &lt;- !is.na(f) &amp; !is.na(obese_vec)
-  tibble(
-    variable = v,
-    level = label_levels(v, lev),
-    n = vapply(seq_along(lev), function(k) sum(ok &amp; f == lev[k], na.rm = TRUE),
-               numeric(1)),
-    pct_obese_weighted = vapply(seq_along(lev), function(k) {
-      i &lt;- which(ok &amp; f == lev[k])
-      round(100 * sum(w_all[i] * obese_vec[i]) / sum(w_all[i]), 1)
-    }, numeric(1))
-  )
-}))
-
-bivariate_tests &lt;- final_tbl
-
-# 7. Model odds ratios, using the design degrees of freedom for p values and intervals
-tidy_or &lt;- function(m, label, ddf) {
-  est &lt;- coef(m)
-  se  &lt;- sqrt(diag(vcov(m)))
-  tibble(
-    model = label,
-    term = names(est),
-    OR = exp(est),
-    lower = exp(est - qt(0.975, ddf) * se),
-    upper = exp(est + qt(0.975, ddf) * se),
-    p_value = 2 * pt(-abs(est / se), ddf)
-  )
-}
-
-model_or &lt;- bind_rows(
-  tidy_or(m_crude, "Unadjusted", df_design),
-  tidy_or(n_adj, "Reduced adjustment (age, gender, race)", df_design),
-  tidy_or(m_adj, "Fully adjusted", df_design)
-) |&gt;
-  mutate(across(c(OR, lower, upper), ~ round(.x, 3)),
-         p_value = signif(p_value, 3))
-
-# 8. Model details
-get_p &lt;- function(rt) if (!is.null(rt$p)) as.numeric(rt$p) else NA_real_
-sleep_p &lt;- function(m) get_p(regTermTest(m, "sleep_group", df = df_design))
-
-model_info &lt;- tibble(
-  model = c("Unadjusted", "Reduced adjustment (age, gender, race)",
-            "Fully adjusted"),
-  n = c(nobs(m_crude), nobs(n_adj), nobs(m_adj)),
-  n_coefficients = c(length(coef(m_crude)), length(coef(n_adj)),
-                     length(coef(m_adj))),
-  design_df = df_design,
-  sleep_overall_p = signif(c(sleep_p(m_crude), sleep_p(n_adj), sleep_p(m_adj)), 3)
-)
-
-# Save everything the dashboard needs in one file
-saveRDS(
-  list(sample_flow = sample_flow, prev_overall = prev_overall,
-       cat_summary = cat_summary, num_summary = num_summary,
-       missingness = missingness, bivariate_prev = bivariate_prev,
-       bivariate_tests = bivariate_tests, model_or = model_or,
-       model_info = model_info, var_labels = var_labels,
-       value_labels = value_labels),
-  "dashboard/results.rds"
-)</code></pre>
+<p>```{#| echo: true} dir.create(“dashboard”, showWarnings = FALSE)</p>
+<p>w_all &lt;- df1_w$WTMEC2YR</p>
 </section>
+</section>
+<section id="readable-labels-for-numeric-codes." class="level1">
+<h1>Readable labels for numeric codes.</h1>
+</section>
+<section id="check-these-against-the-nhanes-codebook-pages-before-publishing." class="level1">
+<h1>CHECK these against the NHANES codebook pages before publishing.</h1>
+<p>value_labels &lt;- list( obese = c(“0” = “Not obese (BMI &lt;30)”, “1” = “Obese (BMI 30+)”), gender = c(“1” = “Male”, “2” = “Female”), race = c(“1” = “Mexican American”, “2” = “Other Hispanic”, “3” = “Non-Hispanic White”, “4” = “Non-Hispanic Black”, “5” = “Other race, including multiracial”), education = c(“1” = “Less than 9th grade”, “2” = “9th-11th grade”, “3” = “High school graduate or GED”, “4” = “Some college or associate degree”, “5” = “College graduate or above”), marital_stat = c(“1” = “Married or living with partner”, “2” = “Widowed, divorced, or separated”, “3” = “Never married”), diabetes = c(“1” = “Yes”, “2” = “No”, “3” = “Borderline”), prediabetes = c(“1” = “Yes”, “2” = “No”), feeling_depressed = c(“0” = “Not at all”, “1” = “Several days”, “2” = “More than half the days”, “3” = “Nearly every day”), usually_works_35plus_hours = c(“1” = “Yes”, “2” = “No”) )</p>
+</section>
+<section id="display-order-for-text-variables-that-would-otherwise-sort-alphabetically" class="level1">
+<h1>Display order for text variables that would otherwise sort alphabetically</h1>
+<p>level_order &lt;- list( bmi_group = c(“Underweight”, “Normal weight”, “Overweight”, “Obesity”), height_group = c(“Below average”, “Average”, “Above average”) )</p>
+<p>var_labels &lt;- c( obese = “Obesity (BMI 30+)”, sleep_group = “Sleep duration”, age_group = “Age group”, income_group = “Income group”, alcohol_group = “Alcohol use (frequency)”, height_group = “Height group”, diabetes = “Diabetes”, prediabetes = “Prediabetes”, race = “Race/ethnicity”, education = “Education”, marital_stat = “Marital status”, gender = “Gender”, usually_works_35plus_hours = “Usually works 35+ hours/week”, feeling_depressed = “Feeling down or depressed”, smoking_status = “Smoking status”, bmi_group = “BMI category”, age = “Age (years)”, height = “Height (cm)”, bmi = “BMI (kg/m2)” )</p>
+<p>get_levels &lt;- function(v) { x &lt;- df1_w[[v]] if (!is.null(level_order[[v]])) { as.character(level_order[[v]]) } else if (is.factor(x)) { levels(x) } else { as.character(sort(unique(x[!is.na(x)]))) } }</p>
+<p>label_levels &lt;- function(v, lev) { lab &lt;- value_labels[[v]] out &lt;- if (is.null(lab)) lev else unname(lab[lev]) ifelse(is.na(out), lev, out) }</p>
+</section>
+<section id="sample-flow" class="level1">
+<h1>1. Sample flow</h1>
+<p>sample_flow &lt;- tibble( step = c(“Adults 20+ in merged file”, “With a positive exam weight”, “Complete data on all model variables”), n = c(nrow(df1), nrow(df1_w), sum(df_full$cc)) )</p>
+</section>
+<section id="overall-obesity-prevalence-weighted" class="level1">
+<h1>2. Overall obesity prevalence (weighted)</h1>
+<p>prev_all &lt;- svymean(~obese, des_all, na.rm = TRUE) prev_model &lt;- svymean(~obese, des, na.rm = TRUE) prev_overall &lt;- tibble( sample = c(“Adults with exam weight”, “Model sample (complete cases)”), prevalence_pct = round(100 * c(coef(prev_all), coef(prev_model)), 1), se_pct = round(100 * c(SE(prev_all), SE(prev_model)), 2) )</p>
+</section>
+<section id="categorical-variable-summaries-weighted-and-unweighted-n-missing-as-its-own-row" class="level1">
+<h1>3. Categorical variable summaries: weighted % and unweighted n, missing as its own row</h1>
+<p>cat_vars &lt;- c(“obese”, chi_vars, “bmi_group”)</p>
+<p>cat_summary &lt;- bind_rows(lapply(cat_vars, function(v) { lev &lt;- get_levels(v) f &lt;- factor(as.character(df1_w[[v]]), levels = lev) ok &lt;- !is.na(f) wsum &lt;- vapply(seq_along(lev), function(k) sum(w_all[which(f == lev[k])]), numeric(1)) tibble( variable = v, level = c(label_levels(v, lev), “Missing”), n = c(as.vector(table(f)), sum(!ok)), pct_weighted = c(round(100 * wsum / sum(w_all[ok]), 1), NA_real_) ) }))</p>
+</section>
+<section id="numeric-variable-summaries" class="level1">
+<h1>4. Numeric variable summaries</h1>
+<p>num_vars &lt;- c(“age”, “height”, “bmi”)</p>
+<p>num_summary &lt;- bind_rows(lapply(num_vars, function(v) { m &lt;- svymean(as.formula(paste0(“~”, v)), des_all, na.rm = TRUE) x &lt;- df1_w[[v]] tibble( variable = v, n = sum(!is.na(x)), n_missing = sum(is.na(x)), mean_weighted = round(as.numeric(coef(m)), 1), se = round(as.numeric(SE(m)), 2), min = min(x, na.rm = TRUE), max = max(x, na.rm = TRUE) ) }))</p>
+</section>
+<section id="missingness-among-adults-with-an-exam-weight" class="level1">
+<h1>5. Missingness among adults with an exam weight</h1>
+<p>id_cols &lt;- c(“SEQN”, “WTMEC2YR”, “SDMVPSU”, “SDMVSTRA”) vars_miss &lt;- setdiff(names(df1_w), id_cols)</p>
+<p>missingness &lt;- tibble( variable = vars_miss, n_missing = unname(vapply(vars_miss, function(v) sum(is.na(df1_w[[v]])), numeric(1))) ) |&gt; mutate(pct_missing = round(100 * n_missing / nrow(df1_w), 1)) |&gt; arrange(desc(pct_missing))</p>
+</section>
+<section id="bivariate-weighted-obese-in-each-category" class="level1">
+<h1>6. Bivariate: weighted % obese in each category</h1>
+<p>obese_vec &lt;- df1_w$obese</p>
+<p>bivariate_prev &lt;- bind_rows(lapply(chi_vars, function(v) { lev &lt;- get_levels(v) f &lt;- factor(as.character(df1_w[[v]]), levels = lev) ok &lt;- !is.na(f) &amp; !is.na(obese_vec) tibble( variable = v, level = label_levels(v, lev), n = vapply(seq_along(lev), function(k) sum(ok &amp; f == lev[k], na.rm = TRUE), numeric(1)), pct_obese_weighted = vapply(seq_along(lev), function(k) { i &lt;- which(ok &amp; f == lev[k]) round(100 * sum(w_all[i] * obese_vec[i]) / sum(w_all[i]), 1) }, numeric(1)) ) }))</p>
+<p>bivariate_tests &lt;- final_tbl</p>
+</section>
+<section id="model-odds-ratios-using-the-design-degrees-of-freedom-for-p-values-and-intervals" class="level1">
+<h1>7. Model odds ratios, using the design degrees of freedom for p values and intervals</h1>
+<p>tidy_or &lt;- function(m, label, ddf) { est &lt;- coef(m) se &lt;- sqrt(diag(vcov(m))) tibble( model = label, term = names(est), OR = exp(est), lower = exp(est - qt(0.975, ddf) * se), upper = exp(est + qt(0.975, ddf) * se), p_value = 2 * pt(-abs(est / se), ddf) ) }</p>
+<p>model_or &lt;- bind_rows( tidy_or(m_crude, “Unadjusted”, df_design), tidy_or(n_adj, “Reduced adjustment (age, gender, race)”, df_design), tidy_or(m_adj, “Fully adjusted”, df_design) ) |&gt; mutate(across(c(OR, lower, upper), ~ round(.x, 3)), p_value = signif(p_value, 3))</p>
+</section>
+<section id="model-details" class="level1">
+<h1>8. Model details</h1>
+<p>get_p &lt;- function(rt) if (!is.null(rt<span class="math inline">\(p)) as.numeric(rt\)</span>p) else NA_real_ sleep_p &lt;- function(m) get_p(regTermTest(m, “sleep_group”, df = df_design))</p>
+<p>model_info &lt;- tibble( model = c(“Unadjusted”, “Reduced adjustment (age, gender, race)”, “Fully adjusted”), n = c(nobs(m_crude), nobs(n_adj), nobs(m_adj)), n_coefficients = c(length(coef(m_crude)), length(coef(n_adj)), length(coef(m_adj))), design_df = df_design, sleep_overall_p = signif(c(sleep_p(m_crude), sleep_p(n_adj), sleep_p(m_adj)), 3) )</p>
+</section>
+<section id="save-everything-the-dashboard-needs-in-one-file" class="level1">
+<h1>Save everything the dashboard needs in one file</h1>
+<p>saveRDS( list(sample_flow = sample_flow, prev_overall = prev_overall, cat_summary = cat_summary, num_summary = num_summary, missingness = missingness, bivariate_prev = bivariate_prev, bivariate_tests = bivariate_tests, model_or = model_or, model_info = model_info, var_labels = var_labels, value_labels = value_labels), “dashboard/results.rds” ) ```</p>
 </section>
 
 </main>

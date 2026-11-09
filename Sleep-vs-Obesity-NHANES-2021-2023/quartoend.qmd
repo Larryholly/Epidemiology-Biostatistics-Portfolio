@@ -12,7 +12,7 @@ Among U.S. adults aged 20 years and older, is sleep duration associated with obe
 ::: callout-note
 ## Analysis note
 
-The analysis asks whether sleep duration is associated with obesity among U.S. adults. The current wording says adjustment for demographic factors, but the full model also includes socioeconomic variables (education, income, and marital status) and behavioral/mental-health variables (alcohol use, smoking, and feeling depressed). Consider revising the question so it matches the full model: “Among U.S. adults, is sleep duration associated with obesity after adjusting for demographic, socioeconomic, and selected behavioral factors?”
+The analysis asks whether sleep duration is associated with obesity among U.S. adults. The current wording says adjustment for demographic factors, but the full model also includes socioeconomic variables (education, income, and marital status) and behavioral/mental-health variables (alcohol use, smoking, and feeling depressed).
 :::
 
 # Data Preparation
@@ -61,12 +61,6 @@ glimpse(demo)
 ```
 
 ## Variable Rename
-
-::: callout-note
-## Analysis note
-
-Renaming the original NHANES variables makes the later code easier to read. Keep the original NHANES variable names documented somewhere in the project so the derived variables can be traced back to their source.
-:::
 
 ###sleep variables
 
