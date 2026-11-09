@@ -1,0 +1,1307 @@
+---
+title: "sleep vs obesity"
+author: "Larry Hollingsworth jr"
+format: html
+editor: visual
+---
+
+# Introduction
+
+Among U.S. adults aged 20 years and older, is sleep duration associated with obesity after adjusting for demographic, socioeconomic, and selected behavioral factors?
+
+::: callout-note
+## Analysis note
+
+The analysis asks whether sleep duration is associated with obesity among U.S. adults. The current wording says adjustment for demographic factors, but the full model also includes socioeconomic variables (education, income, and marital status) and behavioral/mental-health variables (alcohol use, smoking, and feeling depressed). Consider revising the question so it matches the full model: “Among U.S. adults, is sleep duration associated with obesity after adjusting for demographic, socioeconomic, and selected behavioral factors?”
+:::
+
+# Data Preparation
+
+##Load Packages
+
+```{r}
+library(tidyverse)
+library(naniar)
+library(survey)
+library(haven)
+library(ggplot2)
+```
+
+## Load Datasets
+
+::: callout-note
+## Analysis note
+
+The files are NHANES component datasets. SEQN is the participant identifier used to combine records across components. The glimpse() calls are useful checks that each file imported and that the variables needed later are present; the different row counts are expected because not every participant completed every NHANES component.
+:::
+
+```{r}
+sleep <- read_xpt("SLQ_L_.xpt")
+body_measurements <- read_xpt("BMX_L_.xpt")
+demo <-  read_xpt("DEMO_L_.xpt")
+diab <-  read_xpt("DIQ_L.xpt")
+income <-  read_xpt("INQ_L.xpt")
+alcohol <-  read_xpt("ALQ_L.xpt")
+smoke <- read_xpt("SMQ_L.xpt")
+mental <- read_xpt("DPQ_L.xpt")
+occupation <- read_xpt("OCQ_L.xpt")
+```
+
+##inspect imported datasets
+
+```{r}
+glimpse(body_measurements)
+glimpse(sleep)
+glimpse(income)
+glimpse(diab)
+glimpse(mental)
+glimpse(occupation)
+glimpse(smoke)
+glimpse(demo)
+```
+
+## Variable Rename
+
+::: callout-note
+## Analysis note
+
+Renaming the original NHANES variables makes the later code easier to read. Keep the original NHANES variable names documented somewhere in the project so the derived variables can be traced back to their source.
+:::
+
+###sleep variables
+
+```{r}
+sleep1 <-  sleep |> 
+  rename(
+    Usual_sleep_time_on_weekdays_or_workdays = SLQ300,
+    Usual_wake_time_on_weekdays_or_workday = SLQ310,
+    sleep_hours = SLD012,
+    usual_sleep_time_on_weekends = SLQ320,
+    usual_wake_time_on_weekends = SLQ330,
+    sleep_hours_weekends = SLD013
+  )
+```
+
+###body_measurement variables
+
+```{r}
+body_measurements1 <-  body_measurements |> 
+  rename(
+     Body_Measures_Component_Status_Code = BMDSTATS, 
+     weight = BMXWT,
+     weight_comment = BMIWT,
+     recumbent_length = BMXRECUM,
+     recumbent_length_comment = BMIRECUM,
+     head_circumference = BMXHEAD,
+     head_cirumference_comment = BMIHEAD,
+     height =  BMXHT,
+     height_comment = BMIHT,
+     bmi = BMXBMI,
+     bmi_category = BMDBMIC,
+     upper_leg_length = BMXLEG,
+     upper_leg_length_comment = BMILEG,
+     upper_are_length = BMXARML,
+     upper_are_length_commment = BMIARML,
+     arm_circumference = BMXARMC,
+     arm_circumference_comment = BMIARMC,
+     waist_circumference = BMXWAIST,
+     waist_circumference_comment = BMIWAIST,
+     hip_circumference = BMXHIP ,
+     hip_circumference_comment = BMIHIP,
+     
+  )
+
+```
+
+###income variables
+
+```{r}
+income1 <- income |> 
+  rename(
+    income8 = INDFMMPI,
+    monthly_category = INDFMMPC,
+    savings_more_than_twenty_thousand = INQ300,
+    Total_savings_cash_assets = IND310
+    
+  )
+```
+
+###diabetes variables
+
+```{r}
+diab1 <- diab |> 
+  rename(
+   diabetes = DIQ010,
+    age_developed_diabetes = DID040,
+    prediabetes = DIQ160,
+   blood_tested = DIQ180,
+   use_insulin = DIQ050, 
+   how_long_use_insulin = DID060,
+   unit_of_measure = DIQ060U,
+   take_diabetes_pill = DIQ070
+  )
+```
+
+###alcohol variables
+
+```{r}
+alcohol1 <- alcohol |>
+  rename(
+    ever_drink = ALQ111,
+    how_often_drink = ALQ121,
+    avg_drinks_per_day = ALQ130,
+    days_4plus_drinks = ALQ142,
+    times_4plus_drinks_2hours = ALQ270,
+    times_8plus_drinks_1day = ALQ280,
+    ever_4_5plus_drinks_every_day = ALQ151,
+    times_4_5plus_drinks_past_month = ALQ170
+  )
+```
+
+###demograpic variables
+
+```{r}
+demo1 <- demo %>%
+  rename(
+    age = RIDAGEYR,
+    age_in_months_at_screening_0_to_24_mos = RIDAGEMN,
+    race = RIDRETH1,
+    race_with_nh_asian = RIDRETH3,
+    six_month_time_period = RIDEXMON,
+    age_in_months_at_exam_0_to_19_years = RIDEXAGM,
+    served_active_duty_in_us_armed_forces = DMQMILIZ,
+    country_of_birth = DMDBORN4,
+    length_of_time_in_us = DMDYRUSR,
+    education = DMDEDUC2,
+    marital_stat = DMDMARTZ,
+    pregnancy_status_at_exam = RIDEXPRG,
+    total_number_of_people_in_the_household = DMDHHSIZ,
+    hh_ref_persons_gender = DMDHRGND,
+    hh_ref_persons_age_in_years = DMDHRAGZ,
+    hh_ref_persons_education_level = DMDHREDZ,
+    hh_ref_persons_marital_status = DMDHRMAZ,
+    hh_ref_persons_spouses_education_level = DMDHSEDZ,
+    ratio_of_family_income_to_poverty = INDFMPIR,
+    data_release_cycle = SDDSRVYR,
+    interview_examination_status = RIDSTATR,
+    gender = RIAGENDR
+  )
+```
+
+###occupation variables
+
+```{r}
+occupation1 <- occupation |> 
+  rename(
+    employment_status = OCD150,
+    hours_worked_last_week = OCQ180,
+    usually_works_35plus_hours = OCQ210,
+    usual_workdays_per_week = OCQ215,
+    reason_not_working = OCQ383
+  )
+```
+
+###mental health variables
+
+```{r}
+mental1 <- mental |>
+  rename(
+    little_interest = DPQ010,
+    feeling_depressed = DPQ020,
+    sleep_problems = DPQ030,
+    fatigue_low_energy = DPQ040,
+    appetite_problems = DPQ050,
+    negative_self_image = DPQ060,
+    concentration_problems = DPQ070,
+    psychomotor_changes = DPQ080,
+    thoughts_of_death = DPQ090,
+    difficulty_from_problems = DPQ100
+  )
+```
+
+####tobacco use variables
+
+```{r}
+smoke1 <-  smoke |> 
+  rename(
+    smoked_at_least_100_cigs_in_life = SMQ020,
+    do_you_smoke_cigs = SMQ040,
+    days_smoked_cigs_past_30_days = SMD641,
+    avg_cigs_per_Day_past_30_days =SMD650,
+    cigs_menthol_indicator = SMD100MN,
+    cigs_smoked_in_entire_life = SMQ621,
+    age_first_cig = SMD630,
+    questionnaire_mode_flag = SMAQUEX2
+  )
+```
+
+##subgroup/categorize
+
+### bmi_group obese/outcome group
+
+::: callout-note
+## Analysis note
+
+This section creates the BMI-based outcome categories. The binary obese variable used in the logistic regression represents BMI ≥30 versus BMI \<30 among adults with a valid measured BMI. This is a classification based on measured BMI, not a clinical diagnosis.
+:::
+
+```{r}
+body_measurements1 <- body_measurements1 |>
+  mutate(
+    bmi_group = case_when(
+      bmi < 18.5             ~ "Underweight",
+      bmi >= 18.5 & bmi < 25 ~ "Normal weight",
+      bmi >= 25 & bmi < 30   ~ "Overweight",
+      bmi >= 30              ~ "Obesity",
+      TRUE                   ~ NA_character_
+    ),
+    obese = case_when(
+      is.na(bmi) ~ NA_integer_,
+      bmi >= 30  ~ 1L,
+      TRUE       ~ 0L
+    )
+  )
+
+body_measurements1$bmi_group
+body_measurements1$obese
+
+
+
+```
+
+### height group
+
+```{r}
+body_measurements1  <- body_measurements1  |>
+  mutate(
+    height_group = case_when(
+      height < 155 ~ "Below average",
+      height >= 155 & height <= 165 ~ "Average",
+      height > 165 ~ "Above average",
+      TRUE ~ NA_character_
+    )
+  )
+
+body_measurements1$height_group
+```
+
+###smoking group
+
+```{r}
+smoke1 <- smoke1 |>
+  mutate(
+    smoking_status = case_when(
+      smoked_at_least_100_cigs_in_life == 2 ~ "Never",
+      smoked_at_least_100_cigs_in_life == 1 & do_you_smoke_cigs %in% c(1, 2) ~ "Current",
+      smoked_at_least_100_cigs_in_life == 1 & do_you_smoke_cigs == 3 ~ "Former",
+      TRUE ~ NA_character_
+    ),
+    smoking_status = factor(smoking_status,
+                            levels = c("Never", "Former", "Current"))
+  )
+
+```
+
+### Alcohol group
+
+::: callout-note
+## Analysis note
+
+The alcohol categories collapse the original frequency responses into broader groups. This simplifies descriptive and regression analyses, but it also loses detail within each category. The “none in past year” group is the reference category in the full model.
+:::
+
+```{r}
+alcohol1 <- alcohol1 |>
+  mutate(
+    alcohol_group = case_when(
+      how_often_drink %in% c(77, 99) ~ NA_character_,
+      how_often_drink == 0           ~ "None in past year",
+      how_often_drink %in% 7:10      ~ "Infrequent (monthly or less)",
+      how_often_drink %in% 5:6       ~ "Occasional (weekly to 2-3 times/month)",
+      how_often_drink %in% 1:4       ~ "Frequent (2 or more times/week)",
+      TRUE                           ~ NA_character_
+    ),
+    alcohol_group = factor(alcohol_group,
+                           levels = c("None in past year",
+                                      "Infrequent (monthly or less)",
+                                      "Occasional (weekly to 2-3 times/month)",
+                                      "Frequent (2 or more times/week)"))
+  )
+table(alcohol1$alcohol_group, useNA = "ifany")
+```
+
+### Income group
+
+::: callout-note
+## Analysis note
+
+The income groups are derived from the family monthly poverty-income ratio measure used in this code. These are project-defined analytic categories; do not describe them as official program eligibility categories unless that has been independently verified.
+:::
+
+```{r}
+income1 <- income1 |>
+  mutate(
+    income_group = case_when(
+      income8 <= 1.30 ~ "Very low income",
+      income8 > 1.30 & income8 <= 1.85 ~ "Low income",
+      income8 > 1.85 ~ "Above low-income",
+      TRUE ~ NA_character_
+    )
+  )
+
+table(income1$income_group, useNA = "ifany")
+```
+
+### Age groups
+
+::: callout-note
+## Analysis note
+
+Age is grouped into 20–29, 30–44, 45–59, 60–74, and 75+ years. The 20–29 group is the reference category in the regression models. Grouping age makes results easier to communicate but reduces the detail available from treating age as a continuous variable.
+:::
+
+```{r}
+demo1 <- demo1 |>
+  mutate(
+    age_group = case_when(
+      age >= 20 & age < 30 ~ "20–29",
+      age >= 30 & age < 45 ~ "30–44",
+      age >= 45 & age < 60 ~ "45–59",
+      age >= 60 & age < 75 ~ "60–74",
+      age >= 75            ~ "75+",
+      TRUE                 ~ NA_character_
+    )
+  )
+
+table(demo1$age_group, useNA = "ifany")
+```
+
+### Exposure group
+
+::: callout-note
+## Analysis note
+
+Sleep duration is based on the NHANES weekday/workday usual sleep-hours variable. The categories are short sleep (\<7 hours), recommended sleep (7–9 hours), and long sleep (\>9 hours). Recommended sleep is set as the reference group, so the model odds ratios compare short and long sleep with the 7–9-hour group. These are self-reported hours, not objective sleep measurements.
+:::
+
+```{r}
+sleep1 <- sleep1 |>
+  mutate(
+    sleep_hours = as.numeric(sleep_hours),
+
+    sleep_group = case_when(
+      sleep_hours < 7                     ~ "Short sleep (<7 hours)",
+      sleep_hours >= 7 & sleep_hours <= 9 ~ "Recommended sleep (7–9 hours)",
+      sleep_hours > 9                     ~ "Long sleep (>9 hours)",
+      TRUE                                ~ NA_character_
+    ),
+
+    sleep_group = factor(sleep_group,
+                         levels = c("Recommended sleep (7–9 hours)",
+                                    "Short sleep (<7 hours)",
+                                    "Long sleep (>9 hours)"))
+  )
+
+table(sleep1$sleep_group, useNA = "ifany")
+
+class(sleep1$sleep_hours)
+class(sleep1$sleep_group)
+levels(sleep1$sleep_group)
+```
+
+###smoking status variable
+
+```{r}
+smoke1 <- smoke1 |>
+  mutate(
+    smoking_status = case_when(
+      smoked_at_least_100_cigs_in_life == 2 ~ "Never",
+      smoked_at_least_100_cigs_in_life == 1 & do_you_smoke_cigs %in% c(1, 2) ~ "Current",
+      smoked_at_least_100_cigs_in_life == 1 & do_you_smoke_cigs == 3 ~ "Former",
+      TRUE ~ NA_character_
+    ),
+    smoking_status = factor(smoking_status,
+                            levels = c("Never", "Former", "Current"))
+  )
+```
+
+##Merge and filter ###merge into df
+
+```{r}
+df <- sleep1 |>
+  left_join(body_measurements1, by = "SEQN") |>
+  left_join(demo1, by = "SEQN") |>
+  left_join(diab1, by = "SEQN") |>
+  left_join(income1, by = "SEQN") |>
+  left_join(alcohol1, by = "SEQN") |> 
+  left_join(smoke1, by = "SEQN") |> 
+  left_join(occupation1, by="SEQN") |> 
+  left_join(mental1, by="SEQN")
+```
+
+## merge + filter 20 ages
+
+::: callout-note
+## Analysis note
+
+The component files are joined by SEQN, and the analytic population is restricted to adults aged 20 years or older. Keep this age definition consistent in the research question, plots, labels, and written interpretation; do not refer to the sample as adults 18+.
+:::
+
+```{r}
+df1 <- df |>
+  select(
+    height,
+    arm_circumference,
+    waist_circumference,
+    income_group,
+    diabetes,
+    prediabetes,
+    alcohol_group,
+    age_group,
+    race,
+    education,
+    marital_stat,
+    sleep_group,
+    bmi_group,
+    age,
+    height_group, 
+    gender,
+    smoking_status,
+    feeling_depressed,
+    usually_works_35plus_hours,
+    SEQN,
+    WTMEC2YR,
+    SDMVPSU,
+    SDMVSTRA,
+    obese,
+    bmi
+  ) |>
+  filter(age >= 20)
+```
+
+#Exploratory Data Analysis
+
+##Missingness check
+
+###sleep variables missingness
+
+```{r}
+sleep1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+sleep1 |> 
+  gg_miss_var()
+```
+
+### body measurement variables missingness
+
+::: callout-note
+## Analysis note
+
+Missingness checks help show how much information is available for each variable before analysis. Missing values are not automatically errors; they can reflect component nonresponse, skipped questions, or measurements not collected for a participant.
+:::
+
+```{r}
+body_measurements1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing)) |> 
+  print(n=Inf)
+
+
+body_measurements1 |> 
+  gg_miss_var()
+```
+
+###income variables missingness
+
+```{r}
+
+income1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+
+income1 |> 
+  gg_miss_var()
+```
+
+###diabetes variables missingness
+
+```{r}
+diab1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+diab1 |> 
+  gg_miss_var()
+
+```
+
+### alcohol variable missingness
+
+```{r}
+alcohol1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+alcohol1 |> 
+  gg_miss_var()
+```
+
+###demograpic variable missingness
+
+```{r}
+demo1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing)) |> 
+  print(n=Inf)
+
+demo1 |> 
+  gg_miss_var()
+```
+
+###occupation
+
+```{r}
+occupation1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+occupation1 |> 
+  gg_miss_var()
+```
+
+###mental health variable missingness
+
+```{r}
+
+mental1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+mental1 |> 
+  gg_miss_var()
+```
+
+###tobacco-use variable missingness
+
+```{r}
+smoke1 |>
+  summarise(across(
+    everything(),
+    ~ mean(is.na(.)) * 100
+  )) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "percent_missing"
+  ) |>
+  arrange(desc(percent_missing))
+
+smoke1 |> 
+  gg_miss_var()
+```
+
+###missingness among merged dataset
+
+```{r}
+df1 |>
+  gg_miss_var(show_pct = TRUE) +
+  labs(title = "Missing data by variable",
+       subtitle = paste("Adults 20+, n =", nrow(df1)),
+       y = "% missing")
+
+```
+
+##univariate analysis
+
+##numeric variable function
+
+```{r}
+numerical_summary <- function(data, variable) {
+  data |>
+    summarise(
+      mean_x = mean({{ variable }}, na.rm = TRUE),
+      median_x = median({{ variable }}, na.rm = TRUE),
+      sd_x = sd({{ variable }}, na.rm = TRUE),
+      min_x = min({{ variable }}, na.rm = TRUE),
+      max_x = max({{ variable }}, na.rm = TRUE)
+    )
+}
+```
+
+### age numeric summary
+
+::: callout-note
+## Analysis note
+
+The numeric summaries describe the distribution before categorization. Report the age range and summary statistics only if they are relevant to the study population description.
+:::
+
+```{r}
+numerical_summary(df1,age)
+```
+
+### height numeric summary
+
+```{r}
+numerical_summary(df1,height)
+```
+
+###bmi numeric summary
+
+```{r}
+numerical_summary(df1,bmi)
+```
+
+##categorical summary function
+
+```{r}
+categorical_summary <- function(data, variable) {
+  data |>
+    count({{ variable }}) |>
+    mutate(percent = round(n / sum(n) * 100, 1))
+}
+
+```
+
+### sleep group/ exposure variable categorical summary
+
+::: callout-note
+## Analysis note
+
+The sleep-group counts show how participants are distributed across the exposure categories. These are unweighted counts unless the code explicitly applies survey weights; do not interpret them as nationally representative percentages.
+:::
+
+```{r}
+categorical_summary(df1, sleep_group)
+```
+
+### obese group/ outcome variable categorical summary
+
+::: callout-note
+## Analysis note
+
+The outcome summary describes the number classified as obese and non-obese among participants with valid BMI. The missing outcome count should remain visible because those participants cannot contribute to the obesity models.
+:::
+
+```{r}
+categorical_summary(df1,obese)
+```
+
+### age group categorical summary
+
+```{r}
+categorical_summary(df1, age_group)
+```
+
+###income group categorical summary
+
+```{r}
+categorical_summary(df1, income_group)
+```
+
+###alcohol group
+
+```{r}
+categorical_summary(df1, alcohol_group)
+```
+
+###height group
+
+```{r}
+categorical_summary(df1, height_group)
+```
+
+###bmi_group
+
+```{r}
+categorical_summary(df1, bmi_group)
+```
+
+###marital status
+
+```{r}
+categorical_summary(df1, marital_stat)
+```
+
+###diabetes
+
+```{r}
+categorical_summary(df1, diabetes)
+```
+
+###prediabetes
+
+```{r}
+categorical_summary(df1, prediabetes)
+```
+
+###race
+
+```{r}
+categorical_summary(df1, race)
+```
+
+###education
+
+```{r}
+categorical_summary(df1, education)
+```
+
+###gender
+
+```{r}
+categorical_summary(df1, gender) 
+```
+
+###work 35 plus hours
+
+```{r}
+categorical_summary(df1, usually_works_35plus_hours) 
+```
+
+###feeling depressed
+
+```{r}
+categorical_summary(df1, feeling_depressed)
+```
+
+###do you smoke cigarettes
+
+```{r}
+categorical_summary(df1, smoking_status) 
+```
+
+## Bivariate analysis
+
+::: callout-note
+## Analysis note
+
+The bivariate analysis screens each candidate variable for an association with obesity before the multivariable models. These tests are descriptive/exploratory and do not establish that a variable is a confounder or that an association is causal. Variable selection should be guided by the research question and subject-matter reasoning, not p-values alone.
+:::
+
+### Setup
+
+```{r}
+
+chi_vars <- c("sleep_group", "age_group", "income_group", "alcohol_group",
+              "height_group", "diabetes", "prediabetes", "race", "education",
+              "marital_stat", "gender", "usually_works_35plus_hours",
+              "feeling_depressed", "smoking_status")
+```
+
+### Analytic dataset
+
+::: callout-note
+## Analysis note
+
+The bivariate dataset includes participants with a positive MEC examination weight. Special NHANES response codes are recoded to missing where applicable (for example, 7/9 or 77/99). This prevents “refused,” “don't know,” or other non-substantive codes from being treated as real categories.
+:::
+
+```{r}
+df1_w <- df1 |>
+  filter(!is.na(WTMEC2YR), WTMEC2YR > 0) |>
+  mutate(
+    diabetes     = replace(diabetes,     diabetes %in% 9, NA),
+    education    = replace(education,    education %in% 9, NA),
+    marital_stat = replace(marital_stat, marital_stat %in% c(77, 99), NA),
+    prediabetes  = replace(prediabetes,  prediabetes %in% 9, NA),
+    feeling_depressed          = replace(feeling_depressed, feeling_depressed %in% c(7, 9), NA),
+    usually_works_35plus_hours = replace(usually_works_35plus_hours,
+                                         usually_works_35plus_hours %in% c(7, 9), NA)
+  )
+```
+
+###Special code check feeling depressed?
+
+```{r}
+table(df1_w$feeling_depressed, useNA = "ifany")
+```
+
+###Special code check prediabetes?
+
+```{r}
+table(df1_w$prediabetes, useNA = "ifany")
+```
+
+###Special code check marital status
+
+```{r}
+table(df1_w$marital_stat, useNA = "ifany")
+```
+
+#Dataset summary
+
+```{r}
+names(df1_w)
+nrow(df1_w)
+summary(df1_w$WTMEC2YR)          
+table(df1_w$obese, useNA = "ifany")
+```
+
+### Unweighted screening for small cells
+
+::: callout-note
+## Analysis note
+
+The unweighted chi-square checks are used here to identify sparse cells before the survey-weighted tests. In this output, no variable met the stated small-cell flag (minimum observed count \<10 or minimum expected count \<5). The unweighted checks are diagnostics, not the final inferential tests.
+:::
+
+```{r}
+run_chi <- function(var) {
+  d    <- df1_w |> filter(!is.na(.data[[var]]), !is.na(obese))
+  tab  <- table(d[[var]], d$obese)
+  test <- suppressWarnings(chisq.test(tab))
+
+  data.frame(
+    variable     = var,
+    n            = sum(tab),
+    min_observed = min(tab),
+    min_expected = round(min(test$expected), 1)
+  )
+}
+
+chi_results <- bind_rows(lapply(chi_vars, run_chi))
+chi_results
+```
+
+Variables with small cells:
+
+```{r}
+chi_results |> filter(min_observed < 10 | min_expected < 5)
+```
+
+### Cross tabs of flagged variables
+
+```{r}
+table(df1_w$prediabetes, df1_w$obese, useNA = "ifany")
+table(df1_w$usually_works_35plus_hours, df1_w$obese, useNA = "ifany")
+table(df1_w$feeling_depressed, df1_w$obese, useNA = "ifany")
+```
+
+### Survey design for weighted analysis
+
+::: callout-note
+## Analysis note
+
+The survey design incorporates NHANES strata (SDMVSTRA), primary sampling units (SDMVPSU), and MEC examination weights (WTMEC2YR). Accounting for these features is necessary for appropriate variance estimation and population-level inference from the examination sample.
+:::
+
+```{r}
+des_all <- svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA,
+                     weights = ~WTMEC2YR, nest = TRUE, data = df1_w)
+```
+
+### Weighted tests
+
+::: callout-note
+## Analysis note
+
+svychisq() provides design-adjusted tests of association between each candidate variable and obesity. These p-values account for the complex survey design. A small p-value indicates evidence of an association in the bivariate analysis, not an adjusted or causal relationship.
+:::
+
+```{r}
+run_svychi <- function(var) {
+  d    <- subset(des_all, !is.na(des_all$variables[[var]]) & !is.na(obese))
+  test <- svychisq(as.formula(paste("~", var, "+ obese")), d)
+
+  data.frame(
+    variable = var,
+    F_stat   = round(unname(test$statistic), 2),
+    p_value  = test$p.value
+  )
+}
+
+svychi_results <- bind_rows(lapply(chi_vars, run_svychi))
+rownames(svychi_results) <- NULL    # added: removes the X-squared row names
+
+svychi_results |>
+  arrange(desc(p_value))
+```
+
+### Combined table
+
+::: callout-note
+## Analysis note
+
+This table deliberately combines unweighted sample counts (n) with survey-weighted test statistics and p-values. Label that distinction clearly in any presentation or report; the n column is not a weighted population estimate.
+:::
+
+Unweighted n with weighted p values.
+
+```{r}
+final_tbl <- chi_results |>
+  select(variable, n) |>
+  left_join(svychi_results, by = "variable") |>
+  mutate(p_value = signif(p_value, 3))
+
+final_tbl
+```
+
+## Multivariable analysis
+
+### Setup
+
+```{r}
+
+vars_models <- c("obese", "sleep_group", "age_group", "gender", "race", "education",
+                 "income_group", "marital_stat", "alcohol_group", "smoking_status",
+                 "feeling_depressed")
+```
+
+### Prepare variables and flag complete cases
+
+::: callout-note
+## Analysis note
+
+Categorical predictors are converted to factors so the models estimate category-specific contrasts. The complete-case flag requires a nonmissing outcome and every predictor listed in vars_models. Consequently, the adjusted model uses only participants with complete data on all included variables.
+:::
+
+```{r}
+df_full <- df1_w |>
+  mutate(
+    # numeric codes that are really categories
+    gender            = factor(gender),
+    race              = factor(race),
+    education         = factor(education),
+    marital_stat      = factor(marital_stat),
+    feeling_depressed = factor(feeling_depressed),
+    smoking_status = factor(smoking_status),
+
+    # character variables, with the reference group listed first
+    age_group = factor(age_group,
+                       levels = c("20–29", "30–44", "45–59", "60–74", "75+")),
+    income_group = factor(income_group,
+                          levels = c("Above low-income", "Low income", "Very low income")),
+    alcohol_group = factor(alcohol_group,
+                           levels = c("None in past year",
+                                      "Infrequent (monthly or less)",
+                                      "Occasional (weekly to 2-3 times/month)",
+                                      "Frequent (2 or more times/week)"))
+  ) |>
+  mutate(cc = if_all(all_of(vars_models), ~ !is.na(.x)))
+
+sum(df_full$cc)      # analytic sample size
+nrow(df_full)        # all adults with an exam weight
+```
+
+Check the factor setup and missing counts:
+
+```{r}
+sapply(df_full[vars_models], class)
+sapply(df_full[vars_models], function(x) sum(is.na(x)))
+```
+
+### Survey design
+
+::: callout-note
+## Analysis note
+
+The survey design is first created using the full eligible dataset and then subset to complete cases. The output reports 3,780 complete cases out of 6,064 adults with a positive MEC weight. The design degrees of freedom are 15. The weighted mean of the binary obese variable is the weighted obesity prevalence in this complete-case analytic sample.
+:::
+
+The design is built on the full data, then subset to complete cases so that all PSUs stay in the design.
+
+```{r}
+des_full <- svydesign(
+  ids     = ~SDMVPSU,
+  strata  = ~SDMVSTRA,
+  weights = ~WTMEC2YR,
+  nest    = TRUE,
+  data    = df_full
+)
+
+des <- subset(des_full, cc)
+
+svymean(~obese, des)
+
+df_design <- degf(des)
+df_design
+```
+
+### Unadjusted model
+
+::: callout-note
+## Analysis note
+
+m_crude is the unadjusted survey-weighted logistic regression. Its odds ratios compare each sleep category with recommended sleep (7–9 hours), without controlling for other predictors. The crude estimates are short sleep OR 1.42 (95% CI 1.06–1.90) and long sleep OR 1.11 (95% CI 0.77–1.61). The overall Wald test for sleep has p=0.0549.
+:::
+
+```{r}
+m_crude <- svyglm(obese ~ sleep_group, design = des, family = quasibinomial())
+
+summary(m_crude, df.resid = df_design)
+exp(cbind(OR = coef(m_crude), confint(m_crude, ddf = df_design)))
+regTermTest(m_crude, "sleep_group", df = df_design)
+```
+
+### Adjusted model
+
+::: callout-note
+## Analysis note
+
+m_adj is the FULL adjusted model and it does include socioeconomic variables: education, income group, and marital status. It also adjusts for age group, gender, race, alcohol group, smoking status, and feeling-depressed category. Relative to recommended sleep, short sleep has OR 1.23 (95% CI 0.93–1.63) and long sleep has OR 0.95 (95% CI 0.67–1.32). The overall design-based Wald test for sleep is F(2,15)=1.29, p=0.3038. Neither sleep contrast is statistically significant, and the overall test does not provide evidence of an association after adjustment. This is not proof that no association exists.
+:::
+
+```{r}
+m_adj <- svyglm(
+  obese ~ sleep_group + age_group + gender + race + education +
+    income_group + marital_stat + alcohol_group + smoking_status +
+    feeling_depressed,
+  design = des,
+  family = quasibinomial()
+)
+
+summary(m_adj, df.resid = df_design)
+exp(cbind(OR = coef(m_adj), confint(m_adj, ddf = df_design)))
+regTermTest(m_adj, "sleep_group", df = df_design)
+```
+
+### Checks
+
+::: callout-note
+## Analysis note
+
+The full model has 28 estimated coefficients while the survey design has 15 degrees of freedom. The rendered summary also warns that residual degrees of freedom are zero or negative and that some p-values are not defined. Treat the full-model coefficient-level inference cautiously; the overall design-based Wald test and design-based confidence intervals are still shown, but the model is highly parameterized relative to the available design degrees of freedom. This is a precision/stability concern, not a reason to say the model fails to adjust for socioeconomic variables. Both crude and full adjusted models use the same 3,780 complete cases.
+:::
+
+Design degrees of freedom and number of model coefficients:
+
+```{r}
+df_design
+length(coef(m_adj))
+```
+
+Both models should use the same number of people as `sum(df_full$cc)`:
+
+```{r}
+nobs(m_crude)
+nobs(m_adj)
+```
+
+### Crude versus adjusted
+
+::: callout-note
+## Analysis note
+
+This comparison isolates how the sleep odds ratios change after adjustment. Short sleep changes from OR 1.42 to OR 1.23, while long sleep changes from OR 1.11 to OR 0.95. The confidence intervals for both adjusted sleep contrasts include 1, and the full-model overall Wald test is not statistically significant. Describe this as attenuation/change in the estimates after adjustment, not as proof that confounding has been eliminated.
+:::
+
+Confidence intervals use the design degrees of freedom for both models.
+
+```{r}
+get_or <- function(m, label, ddf) {
+  est <- coef(m); ci <- confint(m, ddf = ddf)
+  idx <- grep("sleep_group", names(est))
+  data.frame(model = label, term = names(est)[idx],
+             OR = round(exp(est[idx]), 2),
+             lower = round(exp(ci[idx, 1]), 2),
+             upper = round(exp(ci[idx, 2]), 2))
+}
+
+res <- rbind(get_or(m_crude, "Unadjusted", df_design),
+             get_or(m_adj,   "Adjusted",   df_design))
+rownames(res) <- NULL
+res
+```
+
+###slim model
+
+```{r}
+n_adj <- svyglm(
+  obese ~ sleep_group + age_group + gender + race  ,
+  design = des,
+  family = quasibinomial()
+)
+
+summary(n_adj, df.resid = df_design)
+exp(cbind(OR = coef(n_adj), confint(n_adj, ddf = df_design)))
+regTermTest(n_adj, "sleep_group", df = df_design)
+```
+
+###checks
+
+```{r}
+# Degrees of freedom check
+degf(des)
+length(coef(n_adj))
+```
+
+### crude vs slim model
+
+::: callout-note
+## Analysis note
+
+This comparison is between the crude model and the reduced age/gender/race model, not the full m_adj model. Avoid labelling n_adj simply “Adjusted” because that could be confused with the full adjusted model. Use a label such as “Reduced adjustment (age, gender, race)” and keep the full model as the primary analysis for the stated research question.
+:::
+
+```{r}
+get_or <- function(m, label, ddf) {
+  est <- coef(m)
+  ci <- confint(m, ddf = ddf)
+  
+  idx <- grep("sleep_group", names(est))
+  
+  data.frame(
+    model = label,
+    term = names(est)[idx],
+    OR = round(exp(est[idx]), 2),
+    lower = round(exp(ci[idx, 1]), 2),
+    upper = round(exp(ci[idx, 2]), 2)
+  )
+}
+
+res <- rbind(
+  get_or(m_crude, "Unadjusted", df_design),
+  get_or(n_adj, "Reduced adjustment (age, gender, race)", df_design)
+)
+
+rownames(res) <- NULL
+res
+```
+
+##Results
+
+Before adjustment, short sleep was associated with higher odds of obesity compared with 7-9 hours of sleep (OR 1.42, 95% CI 1.06-1.90), while long sleep showed no clear association (OR 1.11, 95% CI 0.77-1.61). After adjusting for age, gender, race, education, income, marital status, alcohol use, smoking, and depressed mood, the short-sleep estimate was attenuated (OR 1.23, 95% CI 0.93-1.63) and the interval included 1. The long-sleep estimate was also near 1 (OR 0.95, 95% CI 0.67-1.32). The overall test for sleep duration was not statistically significant in the adjusted model (p = 0.30). These results do not show a clear association between sleep duration and obesity after adjustment, though the wide intervals mean a modest association cannot be ruled out.
+
+##Limitations
+
+This study has several limitations. First, the data are cross-sectional, so the temporal order of sleep and obesity cannot be established, and the results describe associations rather than causal effects. Reverse causation is plausible, because obesity can itself disrupt sleep. Second, sleep duration was self-reported and based only on usual weekday or workday sleep, so it is subject to recall and reporting error and may not reflect weekend sleep or sleep quality. Obesity was defined by measured BMI of 30 or higher, which is a practical screening measure but does not distinguish fat from lean mass. Third, the adjusted analysis used complete cases only (3,780 of 6,064 adults with an examination weight), mainly because of missing income and alcohol data, and the participants excluded may differ from those included. NHANES also had a low response rate in this cycle, which may affect representativeness despite the survey weights. Fourth, residual confounding is likely. The models did not include physical activity, diet, sleep apnea, shift work, or medication use. Alcohol use captured drinking frequency rather than quantity, and depressed mood was measured with a single questionnaire item rather than a validated score. Fifth, the survey design had only 15 degrees of freedom while the full model estimated 28 coefficients, so confidence intervals and coefficient-level tests for individual covariates should be interpreted cautiously, and precision for the sleep estimates was limited. The adjusted sleep estimates were not statistically significant, which may reflect limited power as well as a true absence of association. Finally, income groups and other categories were defined for this analysis and grouping continuous variables such as age loses information.
+
+## Save results for the dashboard
+
+\`\`\`{#\| echo: true} dir.create("dashboard", showWarnings = FALSE)
+
+w_all \<- df1_w\$WTMEC2YR
+
+# Readable labels for numeric codes.
+
+# CHECK these against the NHANES codebook pages before publishing.
+
+value_labels \<- list( obese = c("0" = "Not obese (BMI \<30)", "1" = "Obese (BMI 30+)"), gender = c("1" = "Male", "2" = "Female"), race = c("1" = "Mexican American", "2" = "Other Hispanic", "3" = "Non-Hispanic White", "4" = "Non-Hispanic Black", "5" = "Other race, including multiracial"), education = c("1" = "Less than 9th grade", "2" = "9th-11th grade", "3" = "High school graduate or GED", "4" = "Some college or associate degree", "5" = "College graduate or above"), marital_stat = c("1" = "Married or living with partner", "2" = "Widowed, divorced, or separated", "3" = "Never married"), diabetes = c("1" = "Yes", "2" = "No", "3" = "Borderline"), prediabetes = c("1" = "Yes", "2" = "No"), feeling_depressed = c("0" = "Not at all", "1" = "Several days", "2" = "More than half the days", "3" = "Nearly every day"), usually_works_35plus_hours = c("1" = "Yes", "2" = "No") )
+
+# Display order for text variables that would otherwise sort alphabetically
+
+level_order \<- list( bmi_group = c("Underweight", "Normal weight", "Overweight", "Obesity"), height_group = c("Below average", "Average", "Above average") )
+
+var_labels \<- c( obese = "Obesity (BMI 30+)", sleep_group = "Sleep duration", age_group = "Age group", income_group = "Income group", alcohol_group = "Alcohol use (frequency)", height_group = "Height group", diabetes = "Diabetes", prediabetes = "Prediabetes", race = "Race/ethnicity", education = "Education", marital_stat = "Marital status", gender = "Gender", usually_works_35plus_hours = "Usually works 35+ hours/week", feeling_depressed = "Feeling down or depressed", smoking_status = "Smoking status", bmi_group = "BMI category", age = "Age (years)", height = "Height (cm)", bmi = "BMI (kg/m2)" )
+
+get_levels \<- function(v) { x \<- df1_w\[\[v\]\] if (!is.null(level_order\[\[v\]\])) { as.character(level_order\[\[v\]\]) } else if (is.factor(x)) { levels(x) } else { as.character(sort(unique(x\[!is.na(x)\]))) } }
+
+label_levels \<- function(v, lev) { lab \<- value_labels\[\[v\]\] out \<- if (is.null(lab)) lev else unname(lab\[lev\]) ifelse(is.na(out), lev, out) }
+
+# 1. Sample flow
+
+sample_flow \<- tibble( step = c("Adults 20+ in merged file", "With a positive exam weight", "Complete data on all model variables"), n = c(nrow(df1), nrow(df1_w), sum(df_full\$cc)) )
+
+# 2. Overall obesity prevalence (weighted)
+
+prev_all \<- svymean(\~obese, des_all, na.rm = TRUE) prev_model \<- svymean(\~obese, des, na.rm = TRUE) prev_overall \<- tibble( sample = c("Adults with exam weight", "Model sample (complete cases)"), prevalence_pct = round(100 \* c(coef(prev_all), coef(prev_model)), 1), se_pct = round(100 \* c(SE(prev_all), SE(prev_model)), 2) )
+
+# 3. Categorical variable summaries: weighted % and unweighted n, missing as its own row
+
+cat_vars \<- c("obese", chi_vars, "bmi_group")
+
+cat_summary \<- bind_rows(lapply(cat_vars, function(v) { lev \<- get_levels(v) f \<- factor(as.character(df1_w\[\[v\]\]), levels = lev) ok \<- !is.na(f) wsum \<- vapply(seq_along(lev), function(k) sum(w_all\[which(f == lev\[k\])\]), numeric(1)) tibble( variable = v, level = c(label_levels(v, lev), "Missing"), n = c(as.vector(table(f)), sum(!ok)), pct_weighted = c(round(100 \* wsum / sum(w_all\[ok\]), 1), NA_real\_) ) }))
+
+# 4. Numeric variable summaries
+
+num_vars \<- c("age", "height", "bmi")
+
+num_summary \<- bind_rows(lapply(num_vars, function(v) { m \<- svymean(as.formula(paste0("\~", v)), des_all, na.rm = TRUE) x \<- df1_w\[\[v\]\] tibble( variable = v, n = sum(!is.na(x)), n_missing = sum(is.na(x)), mean_weighted = round(as.numeric(coef(m)), 1), se = round(as.numeric(SE(m)), 2), min = min(x, na.rm = TRUE), max = max(x, na.rm = TRUE) ) }))
+
+# 5. Missingness among adults with an exam weight
+
+id_cols \<- c("SEQN", "WTMEC2YR", "SDMVPSU", "SDMVSTRA") vars_miss \<- setdiff(names(df1_w), id_cols)
+
+missingness \<- tibble( variable = vars_miss, n_missing = unname(vapply(vars_miss, function(v) sum(is.na(df1_w\[\[v\]\])), numeric(1))) ) \|\> mutate(pct_missing = round(100 \* n_missing / nrow(df1_w), 1)) \|\> arrange(desc(pct_missing))
+
+# 6. Bivariate: weighted % obese in each category
+
+obese_vec \<- df1_w\$obese
+
+bivariate_prev \<- bind_rows(lapply(chi_vars, function(v) { lev \<- get_levels(v) f \<- factor(as.character(df1_w\[\[v\]\]), levels = lev) ok \<- !is.na(f) & !is.na(obese_vec) tibble( variable = v, level = label_levels(v, lev), n = vapply(seq_along(lev), function(k) sum(ok & f == lev\[k\], na.rm = TRUE), numeric(1)), pct_obese_weighted = vapply(seq_along(lev), function(k) { i \<- which(ok & f == lev\[k\]) round(100 \* sum(w_all\[i\] \* obese_vec\[i\]) / sum(w_all\[i\]), 1) }, numeric(1)) ) }))
+
+bivariate_tests \<- final_tbl
+
+# 7. Model odds ratios, using the design degrees of freedom for p values and intervals
+
+tidy_or \<- function(m, label, ddf) { est \<- coef(m) se \<- sqrt(diag(vcov(m))) tibble( model = label, term = names(est), OR = exp(est), lower = exp(est - qt(0.975, ddf) \* se), upper = exp(est + qt(0.975, ddf) \* se), p_value = 2 \* pt(-abs(est / se), ddf) ) }
+
+model_or \<- bind_rows( tidy_or(m_crude, "Unadjusted", df_design), tidy_or(n_adj, "Reduced adjustment (age, gender, race)", df_design), tidy_or(m_adj, "Fully adjusted", df_design) ) \|\> mutate(across(c(OR, lower, upper), \~ round(.x, 3)), p_value = signif(p_value, 3))
+
+# 8. Model details
+
+get_p \<- function(rt) if (!is.null(rt$p)) as.numeric(rt$p) else NA_real\_ sleep_p \<- function(m) get_p(regTermTest(m, "sleep_group", df = df_design))
+
+model_info \<- tibble( model = c("Unadjusted", "Reduced adjustment (age, gender, race)", "Fully adjusted"), n = c(nobs(m_crude), nobs(n_adj), nobs(m_adj)), n_coefficients = c(length(coef(m_crude)), length(coef(n_adj)), length(coef(m_adj))), design_df = df_design, sleep_overall_p = signif(c(sleep_p(m_crude), sleep_p(n_adj), sleep_p(m_adj)), 3) )
+
+# Save everything the dashboard needs in one file
+
+saveRDS( list(sample_flow = sample_flow, prev_overall = prev_overall, cat_summary = cat_summary, num_summary = num_summary, missingness = missingness, bivariate_prev = bivariate_prev, bivariate_tests = bivariate_tests, model_or = model_or, model_info = model_info, var_labels = var_labels, value_labels = value_labels), "dashboard/results.rds" ) \`\`\`
