@@ -81,4 +81,27 @@ df1 <- df |>
   ) |>
   filter(age >= 20)
 
+df1 <- df1 |>
+  mutate(
+    race = factor(race, levels = 1:5,
+                  labels = c("Mexican American", "Other Hispanic", "Non-Hispanic White",
+                             "Non-Hispanic Black", "Other race, including multiracial")),
+    gender = factor(gender, levels = 1:2, labels = c("Male", "Female")),
+    education = factor(education, levels = 1:5,
+                       labels = c("Less than 9th grade", "9th-11th grade",
+                                  "High school graduate or GED",
+                                  "Some college or associate degree",
+                                  "College graduate or above")),
+    marital_stat = factor(marital_stat, levels = 1:3,
+                          labels = c("Married or living with partner",
+                                     "Widowed, divorced, or separated", "Never married")),
+    diabetes = factor(diabetes, levels = 1:3, labels = c("Yes", "No", "Borderline")),
+    prediabetes = factor(prediabetes, levels = 1:2, labels = c("Yes", "No")),
+    feeling_depressed = factor(feeling_depressed, levels = 0:3,
+                               labels = c("Not at all", "Several days",
+                                          "More than half the days", "Nearly every day")),
+    usually_works_35plus_hours = factor(usually_works_35plus_hours, levels = 1:2,
+                                        labels = c("Yes", "No"))
+  )
+
 
